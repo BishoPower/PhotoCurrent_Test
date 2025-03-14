@@ -62,14 +62,13 @@ with torch.no_grad():
 # 3) Instantiate our model, optimizer, and loss function
 # -----------------------------
 model = SingleClusterOpsinModel(No)
-# Increase learning rate for potentially faster convergence
 optimizer = optim.Adam(model.parameters(), lr=0.05)
 loss_fn = nn.MSELoss()
 
 # -----------------------------
 # 4) Prepare for interactive plotting
 # -----------------------------
-plt.ion()  # Enable interactive mode
+plt.ion()
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
 
 # Setup loss plot
@@ -120,7 +119,7 @@ for epoch in range(epochs):
         if epoch % 50 == 0:
             print(f"Epoch {epoch}, Loss = {loss.item():.6f}")
 
-plt.ioff()  # Turn off interactive mode
+plt.ioff()
 plt.show()
 
 print("Learned A_o:\n", model.A_o.data)
