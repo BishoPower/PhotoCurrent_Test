@@ -32,7 +32,7 @@ class SingleClusterOpsinModel(nn.Module):
 torch.manual_seed(42)
 No = 2
 
-true_A_o = torch.tensor([[0.8, 0.1],
+true_A_o = torch.tensor([[0.8, 0.0],
                          [0.0, 0.95]])
 true_B_o = torch.tensor([[0.5],
                          [0.2]])
