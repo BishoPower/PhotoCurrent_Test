@@ -28,9 +28,7 @@ class SingleClusterOpsinModel(nn.Module):
             y[t] = self.C_o @ x
         return y
 
-# -----------------------------
-# 2) Define hand-tuned "true" parameters to generate a more realistic photocurrent
-# -----------------------------
+
 torch.manual_seed(42)
 No = 2
 
