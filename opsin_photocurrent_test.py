@@ -57,14 +57,14 @@ with torch.no_grad():
     y_target = simulate_photocurrent(true_A_o, true_B_o, true_C_o, beta_true, u)
 
 # -----------------------------
-# 3) Instantiate our model, optimizer, and loss function
+# 2) Instantiate our model, optimizer, and loss function
 # -----------------------------
 model = SingleClusterOpsinModel(No)
 optimizer = optim.Adam(model.parameters(), lr=0.05)
 loss_fn = nn.MSELoss()
 
 # -----------------------------
-# 4) Prepare for interactive plotting
+# 3) Prepare for interactive plotting
 # -----------------------------
 plt.ion()
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
@@ -91,7 +91,7 @@ plt.tight_layout()
 plt.show()
 
 # -----------------------------
-# 5) Training loop with visualization
+# 4) Training loop with visualization
 # -----------------------------
 epochs = 1000
 for epoch in range(epochs):
