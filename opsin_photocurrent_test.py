@@ -2,15 +2,17 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 
 # -----------------------------
-# 1) Define the single-cluster opsin model (with No=2 states)
+# 1) Define the single-cluster opsin model (with full A_o)
 # -----------------------------
 class SingleClusterOpsinModel(nn.Module):
     def __init__(self, No):
         super().__init__()
         # Learnable parameters: A_o, B_o, C_o, beta
-        self.A_o = nn.Parameter(torch.eye(No))
+        self.A_o = nn.Parameter(torch.randn(No, No) * 0.1)  # Full matrix
         self.B_o = nn.Parameter(torch.randn(No, 1) * 0.1)
         self.C_o = nn.Parameter(torch.randn(1, No) * 0.1)
         self.beta = nn.Parameter(torch.tensor(1.0))
@@ -21,8 +23,9 @@ class SingleClusterOpsinModel(nn.Module):
         Returns the photocurrent y of shape [T].
         """
         T = u.shape[0]
-        x = torch.zeros((self.A_o.shape[0],), dtype=u.dtype, device=u.device)
+        x = torch.zeros((self.A_o.size(0),), dtype=u.dtype, device=u.device)
         y = torch.zeros((T,), dtype=u.dtype, device=u.device)
+
         for t in range(T):
             x = self.A_o @ x + self.B_o.view(-1) * (self.beta * u[t])
             y[t] = self.C_o @ x
@@ -120,7 +123,23 @@ for epoch in range(epochs):
 plt.ioff()
 plt.show()
 
-print("Learned A_o:\n", model.A_o.data)
-print("Learned B_o:\n", model.B_o.data)
-print("Learned C_o:\n", model.C_o.data)
-print("Learned beta:\n", model.beta.data)
+# -----------------------------
+# 6) Print learned parameters for the best model
+# -----------------------------
+print("Learned parameters for the best model:")
+print("A_o:\n", best_model.A_o.data)
+print("B_o:\n", best_model.B_o.data)
+print("C_o:\n", best_model.C_o.data)
+print("beta:\n", best_model.beta.data)
+
+# -----------------------------
+# 7) Compare model output and target with metrics
+# -----------------------------
+mse = nn.MSELoss()(y_pred, y_target).item()
+mae = nn.L1Loss()(y_pred, y_target).item()
+r2 = 1 - torch.sum((y_target - y_pred)**2) / torch.sum((y_target - y_target.mean())**2)
+
+print("\nPerformance Metrics:")
+print(f"MSE: {mse:.6f}")
+print(f"MAE: {mae:.6f}")
+print(f"R-squared: {r2:.6f}")
