@@ -59,55 +59,14 @@ with torch.no_grad():
     y_target = simulate_photocurrent(true_A_o, true_B_o, true_C_o, beta_true, u)
 
 # -----------------------------
-# 2) Instantiate our model, optimizer, and loss function
-# 2) Define the RelativeErrorLoss class
+# 2) Load real pulse data from CSV
 # -----------------------------
-class RelativeErrorLoss(nn.Module):
-    def __init__(self, epsilon=1e-6):
-        super().__init__()
-        self.epsilon = epsilon
-
-    def forward(self, y_pred, y_true):
-        return torch.mean(((y_pred - y_true) / (y_true + self.epsilon)) ** 2)
-
-# -----------------------------
-# 3) Load real pulse data from CSV
-# -----------------------------
-model = SingleClusterOpsinModel(No)
-optimizer = optim.Adam(model.parameters(), lr=0.05)
-loss_fn = nn.MSELoss()
-
-# -----------------------------
-# 3) Prepare for interactive plotting
-# -----------------------------
-plt.ion()
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
-
-# Setup loss plot
-losses = []
-loss_line, = ax1.plot([], [], label="Training Loss")
-ax1.set_xlabel("Epoch")
-ax1.set_ylabel("MSE Loss")
-ax1.legend()
-ax1.grid(True)
-
-# Setup photocurrent plot: target and current prediction
-time = range(T)
-target_line, = ax2.plot(time, y_target.numpy(), label="True Photocurrent", marker='o')
-pred_line, = ax2.plot(time, torch.zeros(T).numpy(), label="Predicted Photocurrent", marker='x', linestyle='--')
-ax2.set_xlabel("Time Step")
-ax2.set_ylabel("Photocurrent")
-ax2.set_title("Photocurrent Fitting")
-ax2.legend()
-ax2.grid(True)
-
-plt.tight_layout()
-plt.show()
 # Load pulse_data.csv
 try:
     df = pd.read_csv('pulse_data.csv')
     print(f"Successfully loaded data with {len(df)} rows")
     
+    # Extract time, light intensity, and photocurrent
     t_ms = torch.tensor(df['t_ms'].values, dtype=torch.float32)
     u = torch.tensor(df['u_mWmm2'].values, dtype=torch.float32)
     y_target = torch.tensor(df['I_nA'].values, dtype=torch.float32)
@@ -131,8 +90,9 @@ except Exception as e:
     T = 500
     t_ms = torch.linspace(0, 500, T)
     u = torch.zeros(T)
-    u[100:300] = 1.0  # Light on from t=100 to t=300
+    u[100:300] = 1.0
     
+    # Generate synthetic response
     y_target = torch.zeros(T)
     for i in range(T):
         if i < 100:
@@ -143,9 +103,10 @@ except Exception as e:
             y_target[i] = y_target[299] * torch.exp(-(i-300)/100)
 
 # -----------------------------
-# 4) Experiment with different numbers of opsin states
+# 3) Experiment with different numbers of opsin states
 # -----------------------------
-No_options = [10]
+# Try different numbers of opsin states (5) to see which fits best
+No_options = [5, 6, 7, 8, 9, 10]
 best_model = None
 best_loss = float('inf')
 best_No = None
@@ -153,13 +114,14 @@ best_No = None
 for No in No_options:
     print(f"\nTraining model with {No} opsin states...")
     
+    # Instantiate model, optimizer, and loss function
     model = SingleClusterOpsinModel(No)
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=100, factor=0.5)
-    loss_fn = RelativeErrorLoss(epsilon=1e-6)
+    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=500, factor=0.5)
+    loss_fn = nn.MSELoss()
     
     # Training loop
-    epochs = 4000
+    epochs = 10000
     losses = []
     
     for epoch in range(epochs):
@@ -168,7 +130,7 @@ for No in No_options:
         loss = loss_fn(y_pred, y_target)
         loss.backward()
         optimizer.step()
-        scheduler.step(loss)
+        #scheduler.step(loss)
         
         losses.append(loss.item())
         
@@ -188,7 +150,7 @@ for No in No_options:
 print(f"\nBest model has {best_No} opsin states with loss: {best_loss:.6f}")
 
 # -----------------------------
-# 5) Visualize results with the best model
+# 4) Visualize results with the best model
 # -----------------------------
 with torch.no_grad():
     y_pred = best_model(u)
@@ -199,7 +161,7 @@ plt.figure(figsize=(12, 10))
 plt.subplot(3, 1, 1)
 plt.plot(losses)
 plt.xlabel("Epoch")
-plt.ylabel("Loss")
+plt.ylabel("MSE Loss")
 plt.title(f"Training Loss (No={best_No})")
 plt.grid(True)
 
@@ -211,6 +173,7 @@ plt.ylabel("Light Intensity (mW/mm²)")
 plt.title("Light Input")
 plt.grid(True)
 
+# Plot target vs prediction
 plt.subplot(3, 1, 3)
 plt.plot(t_ms.numpy(), y_target.numpy(), 'b-', label="Measured Photocurrent")
 plt.plot(t_ms.numpy(), y_pred.numpy(), 'r--', label="Model Prediction")
