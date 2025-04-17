@@ -6,40 +6,49 @@ import pandas as pd
 import numpy as np
 
 # -----------------------------
-# 1) Define the single-cluster opsin model (with full A_o)
+# 1) Define the single-cluster opsin model (with full A_o and hidden layers)
 # -----------------------------
 class SingleClusterOpsinModel(nn.Module):
-    def __init__(self, No):
+    def __init__(self, No, hidden_dim=90):
         super().__init__()
-        self.A_o = nn.Parameter(torch.randn(No, No) * 0.1) 
-        self.B_o = nn.Parameter(torch.randn(No, 1) * 0.1)
-        self.C_o = nn.Parameter(torch.randn(1, No) * 0.1)
-        self.beta = nn.Parameter(torch.tensor(1.0))
-        
+        # Define the linear dynamical system parameters
+        self.A_o = nn.Parameter(torch.randn(No, No) * 0.1)  # State transition matrix
+        self.B_o = nn.Parameter(torch.randn(No, 1) * 0.1)  # Input matrix
+        self.C_o = nn.Parameter(torch.randn(1, No) * 0.1)  # Output matrix
+        self.beta = nn.Parameter(torch.tensor(1.0))  # Light sensitivity parameter
+
+        # Define the neural network for nonlinearity
+        self.hidden = nn.Sequential(
+            nn.Linear(No, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, No),
+            nn.ReLU()
+        )
+
     def forward(self, u):
         """
         u: Tensor of shape [T] representing the scalar light input over T time steps.
         Returns the photocurrent y of shape [T].
         """
         T = u.shape[0]
-        x = torch.zeros((self.A_o.size(0),), dtype=u.dtype, device=u.device)
-        y = torch.zeros((T,), dtype=u.dtype, device=u.device)
+        x = torch.zeros((self.A_o.size(0),), dtype=u.dtype, device=u.device)  # Initial state
+        y = torch.zeros((T,), dtype=u.dtype, device=u.device)  # Output photocurrent
 
         for t in range(T):
+            # Update the state using the LDS dynamics
             x = self.A_o @ x + self.B_o.view(-1) * (self.beta * u[t])
+
+            # Pass through the hidden layers (nonlinearity)
+            x = self.hidden(x)
+
+            # Compute the output
             y[t] = self.C_o @ x
         return y
 
 # -----------------------------
-# 2) Define the RelativeErrorLoss class
+# 2) Use Mean Squared Error Loss (MSE)
 # -----------------------------
-class RelativeErrorLoss(nn.Module):
-    def __init__(self, epsilon=1e-6):
-        super().__init__()
-        self.epsilon = epsilon
-
-    def forward(self, y_pred, y_true):
-        return torch.mean(((y_pred - y_true) / (y_true + self.epsilon)) ** 2)
+loss_fn = nn.MSELoss()  # Replace RelativeErrorLoss with MSELoss
 
 # -----------------------------
 # 3) Load real pulse data from CSV
@@ -97,7 +106,6 @@ for No in No_options:
     model = SingleClusterOpsinModel(No)
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=100, factor=0.5)
-    loss_fn = RelativeErrorLoss(epsilon=1e-6)
     
     # Training loop
     epochs = 4000
